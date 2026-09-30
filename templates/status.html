@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="pt-br" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Status da varredura</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Varredouro de Leads">
+      <span class="brand-mark">V</span>
+      <span>Varredouro</span>
+    </a>
+
+    <a class="ghost-action small-action" href="/">Nova varredura</a>
+
+    <button class="theme-toggle" type="button" id="themeToggle" aria-label="Alternar tema" aria-pressed="false">
+      <span class="toggle-track" aria-hidden="true">
+        <span class="toggle-thumb"></span>
+      </span>
+    </button>
+  </header>
+
+  <main class="status-main">
+    <section class="section-inner status-layout">
+      <div class="status-copy">
+        <span class="eyebrow">Job #{{ job.id }}</span>
+        <h1>Status da varredura</h1>
+        <p id="message">{{ job.message }}</p>
+      </div>
+
+      <section class="run-panel status-panel" aria-label="Progresso da varredura">
+        <div class="progress-header">
+          <span id="status">{{ job.status }}</span>
+          <strong id="progress">{{ job.progress }}%</strong>
+        </div>
+
+        <div class="progress-wrap">
+          <div class="progress-bar" id="bar" style="width: {{ job.progress }}%"></div>
+        </div>
+
+        <div id="downloads" class="downloads hidden">
+          <a id="excel" class="primary-action" href="#">
+            <span>📥 Baixar Excel (.xlsx)</span>
+          </a>
+          <a id="csv" class="ghost-action" href="#">
+            <span>📄 Baixar CSV</span>
+          </a>
+        </div>
+
+        <div id="summary" class="summary hidden"></div>
+      </section>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="section-inner footer-wrapper">
+      <div class="footer-top-row">
+        <div class="footer-brand-wrap">
+          <div class="brand">
+            <span class="brand-mark">V</span>
+            <span>Varredouro</span>
+          </div>
+          <p class="footer-tagline">Motor de inteligência para prospecção comercial B2B no Brasil.</p>
+        </div>
+        <div class="footer-legal-links">
+          <button type="button" class="legal-link-btn" onclick="openLegalModal('termos')">Termos de Uso</button>
+          <span class="footer-sep">•</span>
+          <button type="button" class="legal-link-btn" onclick="openLegalModal('lgpd')">Privacidade & LGPD</button>
+          <span class="footer-sep">•</span>
+          <button type="button" class="legal-link-btn" onclick="openLegalModal('isencao')">Aviso Legal & Marcas</button>
+          <span class="footer-sep">•</span>
+          <button type="button" class="legal-link-btn" onclick="openLegalModal('seguranca')">Segurança & Anti-Spam</button>
+        </div>
+      </div>
+      <div class="footer-bottom-row">
+        <small>© 2026 Varredouro de Leads. Plataforma independente em estrita conformidade com a LGPD (Art. 7º, § 4º - Dados Manifestamente Públicos). Todas as marcas citadas pertencem aos seus respectivos titulares.</small>
+      </div>
+    </div>
+  </footer>
+
+  <!-- MODAL DE BLINDAGEM JURÍDICA E SEGURANÇA -->
+  <dialog id="legalModal" class="legal-modal-dialog">
+    <div class="legal-modal-card">
+      <div class="legal-modal-header">
+        <div class="legal-modal-title-wrap">
+          <span class="legal-badge">Conformidade & Segurança Jurídica</span>
+          <h3 id="legalModalTitle">Termos de Uso e Responsabilidade</h3>
+        </div>
+        <button type="button" class="legal-modal-close" onclick="closeLegalModal()" aria-label="Fechar">✕</button>
+      </div>
+
+      <div class="legal-modal-nav">
+        <button type="button" class="legal-nav-btn active" data-tab="termos" onclick="switchLegalTab('termos')">Termos de Uso</button>
+        <button type="button" class="legal-nav-btn" data-tab="lgpd" onclick="switchLegalTab('lgpd')">Privacidade & LGPD</button>
+        <button type="button" class="legal-nav-btn" data-tab="isencao" onclick="switchLegalTab('isencao')">Aviso Legal & Marcas</button>
+        <button type="button" class="legal-nav-btn" data-tab="seguranca" onclick="switchLegalTab('seguranca')">Anti-Spam & Ética</button>
+      </div>
+
+      <div class="legal-modal-body">
+        <!-- ABA 1: TERMOS DE USO -->
+        <div class="legal-tab-pane active" id="pane-termos">
+          <h4>1. Natureza e Finalidade da Plataforma</h4>
+          <p>O <strong>Varredouro de Leads</strong> é um utilitário computacional para busca, catalogação e organização de dados comerciais de pessoas jurídicas disponibilizados de forma pública e aberta na internet (especialmente no Google Maps).</p>
+          
+          <h4>2. Responsabilidade Exclusiva do Operador</h4>
+          <p>A abordagem de prospecção, o envio de comunicações, ligações telefônicas ou mensagens através de aplicativos (como o WhatsApp) são de <strong>exclusiva responsabilidade do usuário da ferramenta</strong>.</p>
+          <p>O Varredouro não realiza disparos automáticos em massa, não envia mensagens em nome do usuário e não interfere nas tratativas comerciais entre as partes.</p>
+
+          <h4>3. Uso Estritamente Comercial e Lícito (B2B)</h4>
+          <p>O operador compromete-se a utilizar os dados exclusivamente para fins profissionais legítimos e relações comerciais entre empresas (B2B), observando a legislação brasileira vigente, inclusive o Marco Civil da Internet (Lei nº 12.965/2014) e o Código de Defesa do Consumidor.</p>
+        </div>
+
+        <!-- ABA 2: PRIVACIDADE & LGPD -->
+        <div class="legal-tab-pane" id="pane-lgpd">
+          <h4>1. Enquadramento Legal da Coleta (Art. 7º, § 4º da LGPD)</h4>
+          <p>O tratamento de dados realizado pelo sistema ampara-se no <strong>Artigo 7º, § 4º da Lei nº 13.709/2018 (LGPD)</strong>, que expressamente dispensa o consentimento prévio para:</p>
+          <blockquote>"dados tornados manifestamente públicos pelo titular, resguardados os direitos do titular e os princípios previstos nesta Lei."</blockquote>
+
+          <h4>2. Legítimo Interesse Comercial B2B (Art. 7º, IX da LGPD)</h4>
+          <p>A indexação restringe-se a dados institucionais de contato (Razão Social, Nome Fantasia, Telefone Comercial, Endereço e Avaliações Públicas) inseridos e mantidos voluntariamente pelas próprias empresas no Google Maps para divulgação de seus negócios ao público em geral.</p>
+
+          <h4>3. Inexistência de Coleta de Dados Sensíveis</h4>
+          <p>O Varredouro <strong>não coleta, não processa e não armazena</strong> quaisquer dados de natureza sensível (Art. 5º, II da LGPD), tais como convicções religiosas, opiniões políticas, dados de saúde, biometria ou dados bancários/financeiros sigilosos.</p>
+
+          <h4>4. Armazenamento Local e Soberania do Usuário</h4>
+          <p>As listas geradas (.xlsx e .csv) são transferidas diretamente para download exclusivo do operador. O sistema não comercializa, não aluga e não redistribui bases de dados de contatos a terceiros.</p>
+        </div>
+
+        <!-- ABA 3: AVISO LEGAL & MARCAS -->
+        <div class="legal-tab-pane" id="pane-isencao">
+          <h4>1. Não Vinculação a Terceiros (Disclaimer Oficial)</h4>
+          <p>O <strong>Varredouro de Leads</strong> é um software independente e <strong>NÃO possui qualquer vínculo societário, parceria comercial, patrocínio ou endosso oficial da Google LLC / Alphabet Inc. ou da Meta Platforms, Inc.</strong></p>
+
+          <h4>2. Propriedade Intelectual e Uso Nominativo</h4>
+          <p>As marcas <em>"Google"</em>, <em>"Google Maps"</em> e <em>"WhatsApp"</em> pertencem exclusivamente aos seus respectivos titulares de propriedade intelectual. A citação destes termos possui caráter estritamente descritivo de compatibilidade funcional e interoperabilidade (uso nominativo), amparado pelo Artigo 132, IV da Lei de Propriedade Industrial (Lei nº 9.279/1996).</p>
+
+          <h4>3. Fornecimento Tecnológico "No Estado"</h4>
+          <p>O sistema é fornecido no estado em que se encontra ("as is"). Os desenvolvedores não se responsabilizam por eventuais alterações estruturais em plataformas terceiras que modifiquem o comportamento das páginas de consulta pública.</p>
+        </div>
+
+        <!-- ABA 4: DIRETRIZES ANTI-SPAM & ÉTICA -->
+        <div class="legal-tab-pane" id="pane-seguranca">
+          <h4>1. Política de Tolerância Zero ao Spam Abusivo</h4>
+          <p>O usuário compromete-se a praticar prospecção comercial qualificada e ética, sendo terminantemente vedado o envio massivo e indiscriminado de mensagens para números que não guardem relação de afinidade com o produto ou serviço ofertado.</p>
+
+          <h4>2. Obrigatoriedade de Canal de Descadastramento (Opt-Out)</h4>
+          <p>Ao contatar empresas pelos telefones obtidos, o operador deve conceder de forma clara e imediata a opção do destinatário solicitar a interrupção das abordagens (opt-out), respeitando a privacidade dos estabelecimentos.</p>
+
+          <h4>3. Isenção por Bloqueios de Linhas e Contas</h4>
+          <p>O Varredouro não se responsabiliza por eventuais suspensões ou banimentos de números no WhatsApp causados por comportamentos abusivos ou violações dos Termos de Serviço da plataforma de mensagens cometidas pelo operador.</p>
+        </div>
+      </div>
+
+      <div class="legal-modal-footer">
+        <button type="button" class="primary-action small-action" onclick="closeLegalModal()">Entendido e Fechar</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    const root = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    const savedTheme = localStorage.getItem('varredouro-smart-theme');
+    const initialTheme = savedTheme || 'light';
+
+    function applyTheme(theme) {
+      root.dataset.theme = theme;
+      themeToggle.setAttribute('aria-pressed', String(theme === 'dark'));
+      localStorage.setItem('varredouro-smart-theme', theme);
+    }
+
+    applyTheme(initialTheme);
+    themeToggle.addEventListener('click', () => {
+      applyTheme(root.dataset.theme === 'dark' ? 'light' : 'dark');
+    });
+
+    // Controle do Modal Legal
+    const legalModal = document.getElementById('legalModal');
+    const legalModalTitle = document.getElementById('legalModalTitle');
+
+    const legalTabTitles = {
+      termos: 'Termos de Uso e Responsabilidade do Operador',
+      lgpd: 'Política de Privacidade e Conformidade LGPD (Lei 13.709/2018)',
+      isencao: 'Aviso Legal e Isenção de Marcas de Terceiros',
+      seguranca: 'Diretrizes de Segurança, Ética Comercial e Anti-Spam'
+    };
+
+    function openLegalModal(tab = 'termos') {
+      if (!legalModal) return;
+      switchLegalTab(tab);
+      if (typeof legalModal.showModal === 'function') {
+        legalModal.showModal();
+      } else {
+        legalModal.setAttribute('open', '');
+      }
+    }
+
+    function closeLegalModal() {
+      if (!legalModal) return;
+      if (typeof legalModal.close === 'function') {
+        legalModal.close();
+      } else {
+        legalModal.removeAttribute('open');
+      }
+    }
+
+    function switchLegalTab(tabId) {
+      document.querySelectorAll('.legal-nav-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabId);
+      });
+      document.querySelectorAll('.legal-tab-pane').forEach(pane => {
+        pane.classList.toggle('active', pane.id === `pane-${tabId}`);
+      });
+      if (legalModalTitle && legalTabTitles[tabId]) {
+        legalModalTitle.textContent = legalTabTitles[tabId];
+      }
+    }
+
+    if (legalModal) {
+      legalModal.addEventListener('click', (e) => {
+        const rect = legalModal.getBoundingClientRect();
+        const isInDialog = (
+          rect.top <= e.clientY && e.clientY <= rect.top + rect.height &&
+          rect.left <= e.clientX && e.clientX <= rect.left + rect.width
+        );
+        if (!isInDialog) {
+          closeLegalModal();
+        }
+      });
+    }
+
+    const jobId = "{{ job.id }}";
+    async function poll() {
+      const res = await fetch(`/api/jobs/${jobId}`);
+      const job = await res.json();
+      document.getElementById('message').textContent = job.message || '';
+      document.getElementById('status').textContent = job.status || '';
+      document.getElementById('progress').textContent = `${job.progress || 0}%`;
+      document.getElementById('bar').style.width = `${job.progress || 0}%`;
+
+      if (job.summary) {
+        const s = job.summary;
+        const totalCidades = Object.keys(s.por_regiao || {}).length;
+        const porRegiao = Object.entries(s.por_regiao || {}).map(([k, v]) => `
+          <li>
+            <span>${k}</span>
+            <strong>${v} ${v === 1 ? 'loja' : 'lojas'}</strong>
+          </li>
+        `).join('');
+
+        document.getElementById('summary').classList.remove('hidden');
+        document.getElementById('summary').innerHTML = `
+          <div class="summary-grid">
+            <div><strong>${s.total}</strong><span>Novos leads</span></div>
+            <div><strong style="color: #22c55e;">${s.quentes || 0}</strong><span>🔥 Leads Quentes</span></div>
+            <div><strong style="color: #f59e0b;">${s.mornos || 0}</strong><span>🟡 Leads Mornos</span></div>
+            <div><strong style="color: #94a3b8;">${s.frios || 0}</strong><span>⚪ Leads Frios</span></div>
+            <div><strong>${s.com_whatsapp || 0}</strong><span>Com WhatsApp</span></div>
+            <div><strong>${s.com_site || 0}</strong><span>Com site / rede</span></div>
+            <div><strong>${job.duplicadas_ignoradas || 0}</strong><span>${job.repetidas_permitidas ? 'Repetidas no resultado' : 'Repetidas ignoradas'}</span></div>
+            <div><strong>${job.historico_total || s.total}</strong><span>No histórico</span></div>
+          </div>
+
+          <details class="city-breakdown-details">
+            <summary class="city-breakdown-summary">
+              <div class="summary-title-wrap">
+                <span>📍 Detalhamento por cidade</span>
+                <span class="city-badge">${totalCidades} ${totalCidades === 1 ? 'cidade' : 'cidades'}</span>
+              </div>
+              <span class="chevron-icon">▼</span>
+            </summary>
+            <div class="city-breakdown-content">
+              <ul class="city-breakdown-list">${porRegiao}</ul>
+            </div>
+          </details>
+        `;
+      }
+
+      if (job.status === 'done') {
+        document.getElementById('downloads').classList.remove('hidden');
+        document.getElementById('excel').href = `/download/${jobId}/excel`;
+        document.getElementById('csv').href = `/download/${jobId}/csv`;
+        return;
+      }
+
+      if (job.status !== 'error') setTimeout(poll, 2000);
+    }
+    poll();
+  </script>
+</body>
+</html>

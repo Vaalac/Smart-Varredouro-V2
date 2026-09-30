@@ -1,0 +1,13 @@
+.venv/
+.playwright-browsers/
+__pycache__/
+*.py[cod]
+*$py.class
+outputs/
+*.log
+*.tmp
+.env
+.env.*
+.DS_Store
+Thumbs.db
+lojas_ja_coletadas.csv
