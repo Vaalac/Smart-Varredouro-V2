@@ -952,12 +952,12 @@ async def executar_varredura(
 
     if headless:
         # MOTOR HYPER-TURBO HTTP (DIRETO ASSÍNCRONO - SEM NAVEGADOR)
-        MAX_CONCURRENT_HTTP = 15
+        MAX_CONCURRENT_HTTP = 35
         num_workers = min(MAX_CONCURRENT_HTTP, max(1, len(regioes)))
 
-        limits = httpx.Limits(max_keepalive_connections=25, max_connections=35)
+        limits = httpx.Limits(max_keepalive_connections=60, max_connections=80)
         async with httpx.AsyncClient(
-            headers=HTTP_HEADERS, follow_redirects=True, timeout=18.0, limits=limits
+            headers=HTTP_HEADERS, follow_redirects=True, timeout=16.0, limits=limits
         ) as client:
 
             async def worker_http():
@@ -994,14 +994,14 @@ async def executar_varredura(
                                 "message": msg,
                             })
 
-                        # Checkpoint incremental a cada 20 cidades ou ao finalizar
-                        if cidades_processadas % 20 == 0 or cidades_processadas == total_cidades:
+                        # Salva CSV incremental a cada 25 cidades (instantâneo)
+                        if cidades_processadas % 25 == 0 or cidades_processadas == total_cidades:
                             if leads_encontrados:
                                 unicos_atuais = tratar_resultados(leads_encontrados)
                                 salvar_csv(unicos_atuais, csv_path)
-                                salvar_excel(unicos_atuais, excel_path)
-
-                    await asyncio.sleep(0.04)
+                                # Excel em checkpoints maiores para poupar CPU
+                                if cidades_processadas % 100 == 0 or cidades_processadas == total_cidades:
+                                    await asyncio.to_thread(salvar_excel, unicos_atuais, excel_path)
 
             tasks = [worker_http() for _ in range(num_workers)]
             await asyncio.gather(*tasks)
