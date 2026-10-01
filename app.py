@@ -106,7 +106,7 @@ def executar_job(job_id: str, regioes: List[str], max_lojas: int, abrir_navegado
             {
                 "status": "done",
                 "progress": 100,
-                "processed": resumo["total"],
+                "processed": len(regioes),
                 "message": mensagem_final,
                 "summary": resumo,
                 "excel_path": resultado["excel_path"],

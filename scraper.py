@@ -2,6 +2,7 @@ import asyncio
 import csv
 import json
 import os
+import random
 import re
 import urllib.parse
 from datetime import datetime
@@ -654,8 +655,16 @@ async def coletar_lojas_cidade(
     return lojas_cidade
 
 
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+]
+
 HTTP_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "User-Agent": USER_AGENTS[0],
     "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
@@ -750,34 +759,71 @@ async def coletar_lojas_cidade_http(
     termo = formatar_termo_busca(cidade).replace(" ", "+")
     busca = f"lojas+de+moveis+{termo}"
     url = f"https://www.google.com/maps/search/{busca}"
-    try:
-        r = await client.get(url, timeout=14.0)
-        if r.status_code != 200:
+
+    for tentativa in range(3):
+        try:
+            req_headers = {
+                "User-Agent": random.choice(USER_AGENTS),
+                "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            }
+            r = await client.get(url, headers=req_headers, timeout=14.0)
+
+            if r.status_code == 429 or "unusual traffic" in r.text.lower():
+                wait_sec = 2.5 * (tentativa + 1)
+                log_erro(log_path, f"Rate limit temporário ao buscar {cidade}. Pausando {wait_sec}s...")
+                await asyncio.sleep(wait_sec)
+                continue
+
+            if r.status_code != 200:
+                if tentativa < 2:
+                    await asyncio.sleep(1.0)
+                    continue
+                return []
+
+            links = re.findall(r'href="(/search\?tbm=map[^"]+)"', r.text)
+            if not links:
+                if tentativa < 2:
+                    await asyncio.sleep(1.0)
+                    continue
+                return []
+
+            ep_url = "https://www.google.com" + links[0].replace("&amp;", "&")
+            r2 = await client.get(ep_url, headers=req_headers, timeout=14.0)
+
+            if r2.status_code == 429 or "unusual traffic" in r2.text.lower():
+                wait_sec = 2.5 * (tentativa + 1)
+                log_erro(log_path, f"Rate limit no endpoint de dados de {cidade}. Pausando {wait_sec}s...")
+                await asyncio.sleep(wait_sec)
+                continue
+
+            if r2.status_code != 200:
+                if tentativa < 2:
+                    await asyncio.sleep(1.0)
+                    continue
+                return []
+
+            body = r2.text
+            if body.startswith(")]}'"):
+                body = body[body.find("\n") + 1 :]
+            data = json.loads(body)
+            d64 = data[64] if len(data) > 64 and isinstance(data[64], list) else []
+            lojas = []
+            for item in d64:
+                if isinstance(item, list) and len(item) > 1 and isinstance(item[1], list):
+                    l = extrair_loja_payload(item[1], cidade)
+                    if l:
+                        lojas.append(l)
+                        if len(lojas) >= max_lojas:
+                            break
+            return lojas
+        except Exception as e:
+            if tentativa < 2:
+                await asyncio.sleep(1.0)
+                continue
+            log_erro(log_path, f"Falha HTTP ao buscar {cidade}: {e}")
             return []
-        links = re.findall(r'href="(/search\?tbm=map[^"]+)"', r.text)
-        if not links:
-            return []
-        ep_url = "https://www.google.com" + links[0].replace("&amp;", "&")
-        r2 = await client.get(ep_url, timeout=14.0)
-        if r2.status_code != 200:
-            return []
-        body = r2.text
-        if body.startswith(")]}'"):
-            body = body[body.find("\n") + 1 :]
-        data = json.loads(body)
-        d64 = data[64] if len(data) > 64 and isinstance(data[64], list) else []
-        lojas = []
-        for item in d64:
-            if isinstance(item, list) and len(item) > 1 and isinstance(item[1], list):
-                l = extrair_loja_payload(item[1], cidade)
-                if l:
-                    lojas.append(l)
-                    if len(lojas) >= max_lojas:
-                        break
-        return lojas
-    except Exception as e:
-        log_erro(log_path, f"Falha HTTP ao buscar {cidade}: {e}")
-        return []
+    return []
 
 
 def salvar_csv(dados: List[Dict], arquivo: Path) -> None:
@@ -955,10 +1001,10 @@ async def executar_varredura(
 
     if headless:
         # MOTOR HYPER-TURBO HTTP (DIRETO ASSÍNCRONO - SEM NAVEGADOR)
-        MAX_CONCURRENT_HTTP = 35
+        MAX_CONCURRENT_HTTP = 10
         num_workers = min(MAX_CONCURRENT_HTTP, max(1, len(regioes)))
 
-        limits = httpx.Limits(max_keepalive_connections=60, max_connections=80)
+        limits = httpx.Limits(max_keepalive_connections=25, max_connections=35)
         async with httpx.AsyncClient(
             headers=HTTP_HEADERS, follow_redirects=True, timeout=16.0, limits=limits
         ) as client:
@@ -1005,6 +1051,8 @@ async def executar_varredura(
                                 # Excel em checkpoints maiores para poupar CPU
                                 if cidades_processadas % 100 == 0 or cidades_processadas == total_cidades:
                                     await asyncio.to_thread(salvar_excel, unicos_atuais, excel_path)
+
+                    await asyncio.sleep(0.08)
 
             tasks = [worker_http() for _ in range(num_workers)]
             await asyncio.gather(*tasks)
