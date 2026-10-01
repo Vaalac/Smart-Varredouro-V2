@@ -200,6 +200,9 @@ def log_erro(log_path: Path, mensagem: str) -> None:
         f.write(f"[{datetime.now().strftime('%H:%M:%S')}] {mensagem}\n")
 
 
+registrar_erro = log_erro
+
+
 def chave_texto(valor: str) -> str:
     valor = limpar_texto(valor or "").lower()
     valor = re.sub(r"https?://(www\.)?", "", valor)
@@ -773,7 +776,7 @@ async def coletar_lojas_cidade_http(
                         break
         return lojas
     except Exception as e:
-        registrar_erro(log_path, f"Falha HTTP ao buscar {cidade}: {e}")
+        log_erro(log_path, f"Falha HTTP ao buscar {cidade}: {e}")
         return []
 
 
