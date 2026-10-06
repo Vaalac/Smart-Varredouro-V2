@@ -3,22 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Varredouro de Leads - Cobertura Nacional</title>
+  <title>Varredouro de Imobiliárias - Prospecção B2B Nacional</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="/" aria-label="Varredouro de Leads">
-      <span class="brand-mark">V</span>
-      <span>Varredouro</span>
+    <a class="brand" href="/" aria-label="Varredouro de Imobiliárias">
+      <span class="brand-mark">🏠</span>
+      <span>Varredouro de Imóveis</span>
     </a>
 
     <nav class="nav-links" aria-label="Navegação principal">
-      <a href="#formulario" class="active">Painel de Varredura</a>
+      <a href="#formulario" class="active">Painel de Prospecção</a>
     </nav>
 
     <div class="header-actions">
-      <a class="header-cta" href="#formulario">Testar agora</a>
+      <a class="header-cta" href="#formulario">Prospectar agora</a>
       <button class="theme-toggle" type="button" id="themeToggle" aria-label="Alternar tema" aria-pressed="false">
         <span class="toggle-track" aria-hidden="true">
           <span class="toggle-thumb"></span>
@@ -31,9 +31,9 @@
     <section class="hero-section" id="formulario">
       <div class="section-inner hero-grid">
         <div class="hero-copy">
-          <span class="eyebrow">Motor Turbo SPA · Cobertura em todas as 27 UFs</span>
-          <h1>Prospecção de leads no <span class="accent-text">Google Maps</span> em alta velocidade.</h1>
-          <p>Colete lojas e empresas comerciais em segundos. O Varredouro extrai telefones, valida WhatsApp direto, calcula Lead Scoring e entrega sua planilha pronta para vender.</p>
+          <span class="eyebrow">Inteligência B2B Imobiliária · Cobertura em todas as 27 UFs</span>
+          <h1>Prospecção de <span class="accent-text">Imobiliárias & Corretores</span> em alta velocidade.</h1>
+          <p>Encontre imobiliárias, corretores autônomos, administradoras de locação e loteadoras em segundos. O Varredouro extrai telefones com WhatsApp direto, e-mails oficiais da Receita Federal e entrega planilhas Excel prontas para vendas.</p>
 
           <div class="hero-stats-strip">
             <div class="hero-stat-item">
@@ -45,16 +45,16 @@
               <span>Qualificação de leads</span>
             </div>
             <div class="hero-stat-item">
-              <strong>~1.5s</strong>
-              <span>Média por cidade</span>
+              <strong>Oficial</strong>
+              <span>Base Receita 2026</span>
             </div>
           </div>
 
           <div class="trust-row" aria-label="Recursos principais">
             <span>✓ WhatsApp wa.me direto</span>
+            <span>✓ E-mails oficiais e CNPJs</span>
             <span>✓ Excel (.xlsx) e CSV</span>
-            <span>✓ Camuflagem anti-bloqueio</span>
-            <span>✓ Checkpoint a cada 15 cidades</span>
+            <span>✓ Zero bloqueios</span>
           </div>
         </div>
 
@@ -64,11 +64,15 @@
           <!-- CABEÇALHO DO CARD -->
           <div class="form-card-header">
             <div>
-              <h3 class="form-card-title">🎯 Nova Varredura</h3>
-              <p class="form-card-subtitle">Configure sua busca de leads em segundos</p>
+              <h3 class="form-card-title">🎯 Varredura Imobiliária</h3>
+              <p class="form-card-subtitle">Captação direta de imobiliárias e corretores via Base Oficial CNPJ</p>
             </div>
-            <span class="turbo-badge">⚡ Motor Turbo Ativo</span>
+            <span class="turbo-badge">🏛️ Base CNPJ Oficial (Zero Bloqueio)</span>
           </div>
+
+          <!-- CONFIGURAÇÃO EXCLUSIVA: MOTOR CNPJ + NICHO IMÓVEIS -->
+          <input type="hidden" name="motor" id="motorInput" value="cnpj">
+          <input type="hidden" name="nicho" id="nichoInput" value="imoveis">
 
           <!-- 1. ONDE VOCÊ QUER BUSCAR? -->
           <div class="form-step">
@@ -170,7 +174,7 @@
             </div>
           </div>
 
-          <!-- 2. QUANTIDADE DE LOJAS POR CIDADE (PILLS RÁPIDAS COM 1 CLIQUE) -->
+          <!-- 2. QUANTIDADE POR CIDADE (PILLS RÁPIDAS COM 1 CLIQUE) -->
           <div class="form-step">
             <div class="step-header">
               <span class="step-label">2. Lojas por cidade</span>
@@ -182,6 +186,8 @@
               <button type="button" class="limit-pill active" data-value="5">5 lojas</button>
               <button type="button" class="limit-pill" data-value="10">10 lojas</button>
               <button type="button" class="limit-pill" data-value="20">20 lojas</button>
+              <button type="button" class="limit-pill" data-value="50">50 lojas</button>
+              <button type="button" class="limit-pill" data-value="100">100 lojas</button>
               <div class="custom-limit-wrap">
                 <input id="max_lojas" type="number" name="max_lojas" min="1" max="100" value="5" required>
                 <span class="custom-limit-unit">lojas</span>
@@ -189,7 +195,7 @@
             </div>
           </div>
 
-          <!-- 3. OPÇÕES AVANÇADAS (DISCRETAS E COLAPSÁVEIS) -->
+          <!-- OPÇÕES AVANÇADAS (DISCRETAS E COLAPSÁVEIS) -->
           <details class="advanced-settings-accordion">
             <summary class="advanced-settings-summary">
               <span class="summary-left">
@@ -205,14 +211,6 @@
                   <small>Inclui lojas que já foram salvas em coletas anteriores</small>
                 </div>
                 <input type="checkbox" id="permitir_repetidas" name="permitir_repetidas" value="true" class="switch-checkbox">
-              </label>
-
-              <label class="clean-switch-row" for="abrir_navegador">
-                <div class="switch-info">
-                  <strong>Modo visual (abrir navegador)</strong>
-                  <small>Abre janela do Chrome para acompanhar a coleta</small>
-                </div>
-                <input type="checkbox" id="abrir_navegador" name="abrir_navegador" value="true" class="switch-checkbox">
               </label>
             </div>
           </details>
@@ -397,6 +395,7 @@
     const limitPills = document.querySelectorAll('.limit-pill');
     const maxLojasInput = document.getElementById('max_lojas');
     const currentLimitHint = document.getElementById('currentLimitHint');
+
 
     function updateLimitHint(val) {
       if (currentLimitHint) {

@@ -24,38 +24,77 @@ from supabase_history import supabase_ativo
 
 MAX_WORKERS = 5
 MAX_SEARCH_CONCURRENCY = 3
-CAMPOS = [
-    "classificacao",
-    "score",
+COLUNAS_EXPORTACAO = [
+    ("status_contato", "Status"),
+    ("nome", "Nome da Empresa"),
+    ("whatsapp", "WhatsApp"),
+    ("telefone", "Telefone"),
+    ("email", "E-mail"),
+    ("regiao", "Cidade / UF"),
+    ("endereco", "Endereço / Bairro"),
+    ("cnpj", "CNPJ"),
+]
+
+CAMPOS = [col for col, _ in COLUNAS_EXPORTACAO] + [
     "link_whatsapp",
+    "score",
+    "classificacao",
     "tipo_contato",
-    "regiao",
-    "nome",
-    "telefone",
-    "whatsapp",
-    "endereco",
+    "telefone2",
+    "bairro",
+    "cep",
     "categoria",
-    "horario",
+    "data_abertura",
     "site",
+    "horario",
     "nota",
     "url",
 ]
-HISTORICO_ARQUIVO = "lojas_ja_coletadas.csv"
-TERMOS_MOVEIS = [
-    "movel", "moveis", "móveis", "mobiliario", "mobiliário",
-    "decoracao", "decoração", "colchoes", "colchões", "estofado",
-    "estofados", "sofa", "sofá", "planejados", "marcenaria",
-    "cama", "mesa", "cadeira", "armario", "armário", "guarda roupa",
-    "guarda-roupa", "rack", "decor", "casa"
+TERMOS_IMOVEIS = [
+    "imovel", "imoveis", "imóvel", "imóveis", "imobiliaria", "imobiliária",
+    "corretor", "corretora", "corretor de imoveis", "corretora de imoveis",
+    "corretor de imóveis", "corretora de imóveis", "creci",
+    "consultoria imobiliaria", "consultoria imobiliária",
+    "negocios imobiliarios", "negócios imobiliários",
+    "venda de imoveis", "venda de imóveis",
+    "locacao de imoveis", "locação de imóveis",
+    "aluguel de imoveis", "aluguel de imóveis",
+    "administracao de imoveis", "administração de imóveis",
+    "administradora de imoveis", "administradora de imóveis",
+    "gestao imobiliaria", "gestão imobiliária",
+    "loteamento", "loteamentos", "incorporadora", "incorporação", "incorporacao"
 ]
+TERMOS_MOVEIS = TERMOS_IMOVEIS
+
 TERMOS_BLOQUEADOS = [
-    "supermercado", "mercado", "hipermercado", "mercearia",
-    "departamento", "eletrodomestico", "eletrodoméstico", "eletronico",
-    "eletrônico", "farmacia", "farmácia", "padaria", "restaurante",
-    "lanchonete", "shopping", "posto de gasolina", "autopecas",
-    "autopeças", "material de construcao", "material de construção",
-    "conveniencia", "conveniência", "variedades", "roupa", "calcados",
-    "calçados", "pet shop", "academia", "oficina", "hotel"
+    # Veículos & Transporte
+    "veiculo", "veiculos", "veículo", "veículos", "carro", "carros", "moto", "motos",
+    "locadora", "rent a car", "autopecas", "autopeças", "auto pecas", "auto peças",
+    "oficina", "mecanica", "mecânica", "posto de gasolina", "combustivel", "combustível",
+    "estacionamento", "lava rapido", "lava rápido", "guincho", "caminhao", "caminhão",
+    "caminhoes", "caminhões", "van", "vans",
+    # Vestuário & Eventos
+    "traje", "trajes", "vestido", "vestidos", "roupa", "roupas", "fantasia", "fantasias",
+    "noiva", "noivas", "festa", "festas", "brinquedo", "brinquedos", "buffet", "decoracao", "decoração",
+    # Máquinas, Ferramentas & Obras
+    "maquina", "maquinas", "máquina", "máquinas", "equipamento", "equipamentos",
+    "ferramenta", "ferramentas", "andaime", "andaimes", "cacamba", "caçamba", "caçambas", "betoneira",
+    # Prédios Residenciais / Portarias
+    "condominio residencial", "condomínio residencial", "condominio edificio", "condomínio edifício",
+    "edificio residencial", "edifício residencial", "residencial clube",
+    # Comércio Geral & Alimentação
+    "supermercado", "mercado", "hipermercado", "mercearia", "padaria", "restaurante",
+    "lanchonete", "pizzaria", "hamburgueria", "bar", "confeitaria", "acougue", "açougue",
+    # Saúde, Beleza & Pets
+    "farmacia", "farmácia", "drogaria", "clinica", "clínica", "hospital", "dentista",
+    "odontologia", "veterinaria", "veterinária", "pet shop", "academia", "crossfit",
+    "salao de beleza", "salão de beleza", "barbearia", "estetica", "estética", "otica", "ótica",
+    # Serviços Gerais & Profissionais
+    "advocacia", "advogado", "advogados", "contabilidade", "contabil", "contábil",
+    "despachante", "autoescola", "auto escola", "grafica", "gráfica", "lavanderia",
+    "hotel", "pousada", "motel", "hostel",
+    # Financeiras & Cartões
+    "banco", "agencia bancaria", "agência bancária", "financeira", "consorcio", "consórcio", "cartao", "cartão"
 ]
 
 ProgressCallback = Optional[Callable[[Dict], None]]
@@ -66,6 +105,8 @@ def formatar_telefone(numero: str) -> str:
         return ""
 
     digits = "".join(c for c in numero if c.isdigit())
+    if len(set(digits)) <= 1 or not any(c in "123456789" for c in digits):
+        return ""
 
     if digits.startswith("55") and len(digits) >= 12:
         digits = digits[2:]
@@ -169,17 +210,20 @@ def classificar_lead(loja: Dict) -> Dict:
     except (ValueError, TypeError):
         score += 5
 
-    if score >= 70:
-        classificacao = "🔥 Quente"
-    elif score >= 40:
-        classificacao = "🟡 Morno"
+    if eh_celular:
+        status_contato = "🔥 WhatsApp"
+    elif tipo_contato == "Telefone Fixo" or digits_tel:
+        status_contato = "📞 Telefone Fixo"
+    elif loja.get("email"):
+        status_contato = "✉️ E-mail"
     else:
-        classificacao = "⚪ Frio"
+        status_contato = "⚪ Sem Contato"
 
-    loja["tipo_contato"] = tipo_contato
+    loja["status_contato"] = status_contato
+    loja["tipo_contato"] = status_contato
     loja["link_whatsapp"] = link_whatsapp
     loja["score"] = score
-    loja["classificacao"] = classificacao
+    loja["classificacao"] = status_contato
 
     return loja
 
@@ -222,22 +266,34 @@ def texto_busca(valor: str) -> str:
     return valor
 
 
-def parece_loja_de_moveis(loja: Dict) -> bool:
-    texto = texto_busca(
-        " ".join(
-            [
-                loja.get("nome", ""),
-                loja.get("categoria", ""),
-                loja.get("site", ""),
-                loja.get("url", ""),
-            ]
-        )
-    )
+def parece_imovel(empresa: Dict) -> bool:
+    nome = texto_busca(empresa.get("nome", ""))
+    categoria = texto_busca(empresa.get("categoria", ""))
+    site = texto_busca(empresa.get("site", ""))
+    texto_completo = f"{nome} {categoria} {site}"
 
-    bloqueado = any(texto_busca(termo) in texto for termo in TERMOS_BLOQUEADOS)
-    permitido = any(texto_busca(termo) in texto for termo in TERMOS_MOVEIS)
+    CATEGORIAS_IMOBILIARIAS = [
+        "agencia imobiliaria", "corretor de imoveis", "consultor imobiliario",
+        "imobiliaria comercial", "avaliador imobiliario", "administradora de imoveis",
+        "servico de locacao de imoveis", "escritorio imobiliario", "imobiliaria",
+        "sociedade imobiliaria"
+    ]
+    eh_categoria_imob = any(c in categoria for c in CATEGORIAS_IMOBILIARIAS)
 
-    return permitido and not bloqueado
+    tem_bloqueado = any(re.search(r'\b' + re.escape(texto_busca(termo)) + r'\b', texto_completo) for termo in TERMOS_BLOQUEADOS)
+    if tem_bloqueado:
+        termos_salvadores = ["imoveis", "imóveis", "imobiliaria", "imobiliária", "corretor", "corretora", "creci"]
+        if not (eh_categoria_imob or any(s in nome for s in termos_salvadores)):
+            return False
+
+    if eh_categoria_imob:
+        return True
+
+    permitido = any(re.search(r'\b' + re.escape(texto_busca(termo)) + r'\b', texto_completo) for termo in TERMOS_IMOVEIS)
+    return permitido
+
+
+parece_loja_de_moveis = parece_imovel
 
 
 def chave_telefone(valor: str) -> str:
@@ -350,7 +406,7 @@ def filtrar_lojas_novas(dados: List[Dict], chaves_historico: Set[str]) -> Tuple[
 
 async def buscar_links_regiao(page, regiao: str, max_lojas: int, log_path: Path) -> List[str]:
     termo = formatar_termo_busca(regiao).replace(" ", "+")
-    busca = f"lojas+de+moveis+{termo}"
+    busca = f"imobiliarias+{termo}"
     url = f"https://www.google.com/maps/search/{busca}"
 
     for tentativa in range(3):
@@ -517,7 +573,7 @@ async def coletar_lojas_cidade(
     log_path: Path,
 ) -> List[Dict]:
     termo = formatar_termo_busca(regiao).replace(" ", "+")
-    busca = f"lojas+de+moveis+{termo}"
+    busca = f"imobiliarias+{termo}"
     url = f"https://www.google.com/maps/search/{busca}"
 
     for tentativa in range(3):
@@ -594,7 +650,7 @@ async def coletar_lojas_cidade(
             let horario = '';
 
             for (const line of lines) {
-                if (line.includes('Loja de') || line.includes('Móveis') || line.includes('Marcenaria') || line.includes('Colchões') || line.includes('Estofados')) {
+                if (line.includes('Imobiliária') || line.includes('Imóveis') || line.includes('Corretor') || line.includes('Administradora') || line.includes('Loteamento') || line.includes('Incorporadora') || line.includes('Imobiliaria') || line.includes('Imoveis')) {
                     categoria = line.split('·')[0].trim();
                 }
                 if (line.includes('Rua') || line.includes('Av.') || line.includes('Avenida') || line.includes('Rodovia') || line.includes('Estr.') || line.includes('Praça') || line.includes('Alameda')) {
@@ -757,7 +813,7 @@ async def coletar_lojas_cidade_http(
     client: httpx.AsyncClient, cidade: str, max_lojas: int, log_path: Path
 ) -> List[Dict]:
     termo = formatar_termo_busca(cidade).replace(" ", "+")
-    busca = f"lojas+de+moveis+{termo}"
+    busca = f"imobiliarias+{termo}"
     url = f"https://www.google.com/maps/search/{busca}"
 
     for tentativa in range(3):
@@ -829,81 +885,127 @@ async def coletar_lojas_cidade_http(
 def salvar_csv(dados: List[Dict], arquivo: Path) -> None:
     arquivo.parent.mkdir(parents=True, exist_ok=True)
     with arquivo.open("w", newline="", encoding="utf-8-sig", errors="replace") as f:
-        writer = csv.DictWriter(f, fieldnames=CAMPOS, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(dados)
+        writer = csv.writer(f)
+        writer.writerow([cab for _, cab in COLUNAS_EXPORTACAO])
+        for d in dados:
+            status = d.get("status_contato") or d.get("classificacao", "")
+            writer.writerow([
+                status,
+                d.get("nome", ""),
+                d.get("whatsapp", ""),
+                d.get("telefone", ""),
+                d.get("email", ""),
+                d.get("regiao", ""),
+                d.get("endereco", ""),
+                d.get("cnpj", ""),
+            ])
 
 
 def salvar_excel(dados: List[Dict], arquivo: Path) -> None:
     arquivo.parent.mkdir(parents=True, exist_ok=True)
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Lojas de Móveis"
-
-    cabecalhos = [
-        "Classificação",
-        "Score",
-        "Link WhatsApp",
-        "Tipo Contato",
-        "Região",
-        "Nome",
-        "Telefone",
-        "WhatsApp",
-        "Endereço",
-        "Categoria",
-        "Horário",
-        "Site",
-        "Nota",
-        "URL",
-    ]
-    chaves = CAMPOS
+    ws.title = "Leads Imobiliários"
 
     header_fill = PatternFill("solid", fgColor="1F3864")
-    header_font = Font(bold=True, color="FFFFFF")
+    header_font = Font(bold=True, color="FFFFFF", size=11)
 
-    fill_quente = PatternFill("solid", fgColor="DCFCE7")
-    fill_morno = PatternFill("solid", fgColor="FEF3C7")
-    fill_frio = PatternFill("solid", fgColor="F3F4F6")
+    fill_wa = PatternFill("solid", fgColor="DCFCE7")
+    font_wa = Font(bold=True, color="166534")
 
-    font_quente = Font(bold=True, color="166534")
-    font_morno = Font(bold=True, color="92400E")
-    font_frio = Font(bold=False, color="4B5563")
+    fill_fixo = PatternFill("solid", fgColor="FEF3C7")
+    font_fixo = Font(bold=True, color="92400E")
+
+    fill_email = PatternFill("solid", fgColor="DBEAFE")
+    font_email = Font(bold=True, color="1E40AF")
+
+    fill_padrao = PatternFill("solid", fgColor="F3F4F6")
+    font_padrao = Font(bold=False, color="4B5563")
+
     font_link = Font(color="0563C1", underline="single")
+    font_nome = Font(bold=True, color="1E293B")
 
-    for col, cab in enumerate(cabecalhos, 1):
+    # 1. Cabeçalhos
+    for col, (_, cab) in enumerate(COLUNAS_EXPORTACAO, 1):
         cell = ws.cell(row=1, column=col, value=cab)
         cell.fill = header_fill
         cell.font = header_font
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    for row_idx, loja in enumerate(dados, 2):
-        for col_idx, chave in enumerate(chaves, 1):
-            val = loja.get(chave, "")
-            cell = ws.cell(row=row_idx, column=col_idx, value=val)
+    # 2. Linhas de dados
+    for row_idx, d in enumerate(dados, 2):
+        status = d.get("status_contato") or d.get("classificacao", "")
+        nome = d.get("nome", "")
+        whatsapp = d.get("whatsapp", "")
+        link_wa = d.get("link_whatsapp", "")
+        telefone = d.get("telefone", "")
+        email = d.get("email", "")
+        regiao = d.get("regiao", "")
+        endereco = d.get("endereco", "")
+        cnpj = d.get("cnpj", "")
 
-            if chave == "classificacao":
-                cell.alignment = Alignment(horizontal="center", vertical="center")
-                if "Quente" in str(val):
-                    cell.fill = fill_quente
-                    cell.font = font_quente
-                elif "Morno" in str(val):
-                    cell.fill = fill_morno
-                    cell.font = font_morno
-                elif "Frio" in str(val):
-                    cell.fill = fill_frio
-                    cell.font = font_frio
-            elif chave in ("score", "tipo_contato", "nota"):
-                cell.alignment = Alignment(horizontal="center", vertical="center")
+        # 1. Status
+        c_status = ws.cell(row=row_idx, column=1, value=status)
+        c_status.alignment = Alignment(horizontal="center", vertical="center")
+        if "WhatsApp" in str(status):
+            c_status.fill = fill_wa
+            c_status.font = font_wa
+        elif "Fixo" in str(status) or "Telefone" in str(status):
+            c_status.fill = fill_fixo
+            c_status.font = font_fixo
+        elif "E-mail" in str(status) or "Email" in str(status):
+            c_status.fill = fill_email
+            c_status.font = font_email
+        else:
+            c_status.fill = fill_padrao
+            c_status.font = font_padrao
 
-            if chave in ("link_whatsapp", "site", "url") and str(val).startswith("http"):
-                cell.hyperlink = val
-                cell.font = font_link
+        # 2. Nome da Empresa
+        c_nome = ws.cell(row=row_idx, column=2, value=nome)
+        c_nome.font = font_nome
+        c_nome.alignment = Alignment(horizontal="left", vertical="center")
 
-    larguras = [16, 10, 36, 20, 22, 35, 18, 18, 45, 25, 20, 35, 8, 50]
+        # 3. WhatsApp (com link direto wa.me)
+        c_wa = ws.cell(row=row_idx, column=3, value=whatsapp)
+        c_wa.alignment = Alignment(horizontal="center", vertical="center")
+        if link_wa:
+            c_wa.hyperlink = link_wa
+            c_wa.font = font_link
+        elif whatsapp:
+            dig = "".join(c for c in whatsapp if c.isdigit())
+            if len(dig) in (10, 11):
+                c_wa.hyperlink = f"https://wa.me/55{dig}"
+                c_wa.font = font_link
+
+        # 4. Telefone
+        c_tel = ws.cell(row=row_idx, column=4, value=telefone)
+        c_tel.alignment = Alignment(horizontal="center", vertical="center")
+
+        # 5. E-mail (com mailto:)
+        c_email = ws.cell(row=row_idx, column=5, value=email)
+        c_email.alignment = Alignment(horizontal="left", vertical="center")
+        if email and "@" in email:
+            c_email.hyperlink = f"mailto:{email}"
+            c_email.font = font_link
+
+        # 6. Cidade / UF
+        c_reg = ws.cell(row=row_idx, column=6, value=regiao)
+        c_reg.alignment = Alignment(horizontal="center", vertical="center")
+
+        # 7. Endereço / Bairro
+        c_end = ws.cell(row=row_idx, column=7, value=endereco)
+        c_end.alignment = Alignment(horizontal="left", vertical="center")
+
+        # 8. CNPJ
+        c_cnpj = ws.cell(row=row_idx, column=8, value=cnpj)
+        c_cnpj.alignment = Alignment(horizontal="center", vertical="center")
+
+    larguras = [18, 38, 20, 18, 32, 22, 42, 22]
     for col, largura in enumerate(larguras, 1):
         ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = largura
 
     ws.freeze_panes = "A2"
+    ws.row_dimensions[1].height = 26
     wb.save(arquivo)
 
 
@@ -931,24 +1033,26 @@ def tratar_resultados(resultados: List[Dict]) -> List[Dict]:
         unicos.append(d)
 
     def chave_ordenacao(item: Dict):
-        score = item.get("score", 0)
-        try:
-            nota = float(str(item.get("nota") or "0").replace(",", "."))
-        except Exception:
-            nota = 0.0
-        return (score, nota)
+        reg = item.get("regiao", "")
+        partes = reg.split(",")
+        cidade = partes[0].strip() if partes else ""
+        uf = partes[1].strip() if len(partes) > 1 else ""
+        status = str(item.get("status_contato") or item.get("classificacao") or "")
+        peso = 0 if "WhatsApp" in status else (1 if "Fixo" in status or "Telefone" in status else (2 if "E-mail" in status else 3))
+        return (uf, cidade, peso, item.get("nome", ""))
 
-    unicos.sort(key=chave_ordenacao, reverse=True)
+    unicos.sort(key=chave_ordenacao)
     return unicos
 
 
 def montar_resumo(dados: List[Dict], regioes: List[str]) -> Dict:
     total = len(dados)
-    quentes = sum(1 for d in dados if "Quente" in str(d.get("classificacao", "")))
-    mornos = sum(1 for d in dados if "Morno" in str(d.get("classificacao", "")))
-    frios = sum(1 for d in dados if "Frio" in str(d.get("classificacao", "")))
+    quentes = sum(1 for d in dados if "WhatsApp" in str(d.get("status_contato") or d.get("classificacao", "")))
+    mornos = sum(1 for d in dados if "Fixo" in str(d.get("status_contato") or d.get("classificacao", "")))
+    frios = sum(1 for d in dados if "E-mail" in str(d.get("status_contato") or d.get("classificacao", "")) or "Frio" in str(d.get("classificacao", "")))
     com_whatsapp = sum(1 for d in dados if d.get("link_whatsapp") or d.get("whatsapp"))
     com_telefone = sum(1 for d in dados if d.get("telefone"))
+    com_email = sum(1 for d in dados if d.get("email"))
     com_site = sum(1 for d in dados if d.get("site"))
 
     por_regiao = {regiao: sum(1 for d in dados if d.get("regiao") == regiao) for regiao in regioes}
@@ -960,6 +1064,7 @@ def montar_resumo(dados: List[Dict], regioes: List[str]) -> Dict:
         "frios": frios,
         "com_whatsapp": com_whatsapp,
         "com_telefone": com_telefone,
+        "com_email": com_email,
         "com_site": com_site,
         "por_regiao": por_regiao,
     }

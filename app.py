@@ -4,7 +4,7 @@ import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from fastapi import BackgroundTasks, FastAPI, Form, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
@@ -21,6 +21,7 @@ from municipios_br import (
     validar_regiao,
 )
 from scraper import executar_varredura
+from cnpj_scraper import NICHOS, executar_varredura_cnpj
 
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUTS_DIR = BASE_DIR / "outputs"
@@ -45,9 +46,39 @@ def executar_async(coro):
     return asyncio.run(coro)
 
 
+def salvar_job_disco(job_id: str) -> None:
+    job = jobs.get(job_id)
+    if not job:
+        return
+    job_dir = OUTPUTS_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    status_file = job_dir / "status.json"
+    try:
+        conteudo = json.dumps(job, ensure_ascii=False, indent=2, default=str)
+        status_file.write_text(conteudo, encoding="utf-8")
+    except Exception as e:
+        pass
+
+
+def carregar_job_disco(job_id: str) -> Optional[Dict]:
+    status_file = OUTPUTS_DIR / job_id / "status.json"
+    if status_file.exists():
+        try:
+            with status_file.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+                jobs[job_id] = data
+                return data
+        except Exception:
+            pass
+    return None
+
+
 def atualizar_job(job_id: str, patch: Dict) -> None:
+    if job_id not in jobs:
+        jobs[job_id] = {}
     jobs[job_id].update(patch)
     jobs[job_id]["updated_at"] = datetime.now().isoformat(timespec="seconds")
+    salvar_job_disco(job_id)
 
 
 def progress_factory(job_id: str):
@@ -78,29 +109,53 @@ def progress_factory(job_id: str):
     return progress
 
 
-def executar_job(job_id: str, regioes: List[str], max_lojas: int, abrir_navegador: bool, permitir_repetidas: bool) -> None:
+def executar_job(
+    job_id: str,
+    regioes: List[str],
+    max_lojas: int,
+    abrir_navegador: bool,
+    permitir_repetidas: bool,
+    motor: str = "cnpj",
+    nicho: str = "imoveis",
+    cnae_custom: Optional[str] = None,
+) -> None:
     try:
-        atualizar_job(job_id, {"status": "running", "message": "Iniciando varredura ultra-rápida..."})
+        motor_label = "Receita Federal CNPJ" if motor == "cnpj" else "Google Maps"
+        atualizar_job(job_id, {"status": "running", "message": f"Iniciando varredura via {motor_label}..."})
         job_dir = OUTPUTS_DIR / job_id
-        resultado = executar_async(
-            executar_varredura(
-                regioes=regioes,
-                max_lojas=max_lojas,
-                output_dir=job_dir,
-                headless=not abrir_navegador,
-                progress_cb=progress_factory(job_id),
-                permitir_repetidas=permitir_repetidas,
+
+        if motor == "cnpj":
+            resultado = executar_async(
+                executar_varredura_cnpj(
+                    regioes=regioes,
+                    nicho=nicho,
+                    cnae_custom=cnae_custom,
+                    max_lojas=max_lojas,
+                    output_dir=job_dir,
+                    progress_cb=progress_factory(job_id),
+                    permitir_repetidas=permitir_repetidas,
+                )
             )
-        )
+        else:
+            resultado = executar_async(
+                executar_varredura(
+                    regioes=regioes,
+                    max_lojas=max_lojas,
+                    output_dir=job_dir,
+                    headless=not abrir_navegador,
+                    progress_cb=progress_factory(job_id),
+                    permitir_repetidas=permitir_repetidas,
+                )
+            )
 
         resumo = resultado["resumo"]
         duplicadas = resultado.get("duplicadas_ignoradas", 0)
         historico_total = resultado.get("historico_total", resumo["total"])
         mensagem_final = "Varredura finalizada. Baixe o Excel ou CSV abaixo."
         if resultado.get("repetidas_permitidas"):
-            mensagem_final = f"Varredura finalizada incluindo lojas repetidas. {duplicadas} lojas do resultado já estavam no histórico."
+            mensagem_final = f"Varredura finalizada incluindo registros repetidos. {duplicadas} do resultado já constavam no histórico."
         elif duplicadas:
-            mensagem_final = f"Varredura finalizada. {duplicadas} lojas repetidas foram ignoradas. Baixe os novos leads abaixo."
+            mensagem_final = f"Varredura finalizada. {duplicadas} repetidos foram ignorados. Baixe os novos leads abaixo."
         atualizar_job(
             job_id,
             {
@@ -115,6 +170,8 @@ def executar_job(job_id: str, regioes: List[str], max_lojas: int, abrir_navegado
                 "duplicadas_ignoradas": duplicadas,
                 "repetidas_permitidas": resultado.get("repetidas_permitidas", False),
                 "historico_total": historico_total,
+                "motor": motor,
+                "nicho": nicho,
             },
         )
     except Exception as e:
@@ -138,6 +195,7 @@ def home(request: Request):
             "capitais": obter_capitais(),
             "total_cidades": len(MUNICIPIOS_LISTA),
             "regioes": ESTADOS["SP"]["cidades"],
+            "nichos": NICHOS,
         },
     )
 
@@ -175,6 +233,9 @@ def executar(
     max_lojas: int = Form(20),
     abrir_navegador: bool = Form(False),
     permitir_repetidas: bool = Form(False),
+    motor: str = Form("cnpj"),
+    nicho: str = Form("imoveis"),
+    cnae_custom: Optional[str] = Form(None),
 ):
     if any(r in ("__TODAS__", "BRASIL_INTEIRO", "TODAS") for r in regioes):
         regioes_validas = list(MUNICIPIOS_LISTA)
@@ -194,21 +255,33 @@ def executar(
         "progress": 0,
         "processed": 0,
         "total": 0,
-        "message": "Na fila para execução ultra-rápida...",
+        "message": "Na fila para execução...",
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "updated_at": datetime.now().isoformat(timespec="seconds"),
         "regioes": regioes_validas,
         "max_lojas": max_lojas,
         "permitir_repetidas": permitir_repetidas,
+        "motor": motor,
+        "nicho": nicho,
     }
 
-    background_tasks.add_task(executar_job, job_id, regioes_validas, max_lojas, abrir_navegador, permitir_repetidas)
+    background_tasks.add_task(
+        executar_job,
+        job_id,
+        regioes_validas,
+        max_lojas,
+        abrir_navegador,
+        permitir_repetidas,
+        motor,
+        nicho,
+        cnae_custom,
+    )
     return RedirectResponse(url=f"/status/{job_id}", status_code=303)
 
 
 @app.get("/status/{job_id}", response_class=HTMLResponse)
 def status_page(request: Request, job_id: str):
-    job = jobs.get(job_id)
+    job = jobs.get(job_id) or carregar_job_disco(job_id)
     if not job:
         return templates.TemplateResponse("not_found.html", {"request": request}, status_code=404)
     return templates.TemplateResponse("status.html", {"request": request, "job": job})
@@ -216,14 +289,14 @@ def status_page(request: Request, job_id: str):
 
 @app.get("/api/jobs/{job_id}")
 def status_api(job_id: str):
-    job = jobs.get(job_id)
+    job = jobs.get(job_id) or carregar_job_disco(job_id)
     if not job:
         return JSONResponse({"error": "Job não encontrado"}, status_code=404)
     return dict(job)
 
 
 def arquivo_do_job(job_id: str, tipo: str) -> Path:
-    job = jobs.get(job_id)
+    job = jobs.get(job_id) or carregar_job_disco(job_id)
     if not job:
         raise FileNotFoundError("Job não encontrado")
     key = "excel_path" if tipo == "excel" else "csv_path"

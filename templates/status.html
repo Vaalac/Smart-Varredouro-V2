@@ -233,12 +233,26 @@
 
     const jobId = "{{ job.id }}";
     async function poll() {
-      const res = await fetch(`/api/jobs/${jobId}`);
-      const job = await res.json();
-      document.getElementById('message').textContent = job.message || '';
-      document.getElementById('status').textContent = job.status || '';
-      document.getElementById('progress').textContent = `${job.progress || 0}%`;
-      document.getElementById('bar').style.width = `${job.progress || 0}%`;
+      try {
+        const res = await fetch(`/api/jobs/${jobId}`);
+        if (!res.ok) {
+          document.getElementById('status').textContent = 'interrompido';
+          document.getElementById('status').style.color = '#ef4444';
+          document.getElementById('message').innerHTML = '⚠️ Esta execução foi interrompida ou expirou. <br><a href="/" style="display:inline-block; margin-top:12px; color:var(--primary); font-weight:600; text-decoration:underline;">👈 Clique aqui para voltar e iniciar nova varredura</a>';
+          return;
+        }
+        const job = await res.json();
+        if (job.status === 'error') {
+          document.getElementById('status').textContent = 'erro';
+          document.getElementById('status').style.color = '#ef4444';
+          document.getElementById('message').innerHTML = `⚠️ ${job.message || 'Erro durante a coleta.'} <br><a href="/" style="display:inline-block; margin-top:12px; color:var(--primary); font-weight:600; text-decoration:underline;">👈 Clique aqui para voltar ao início</a>`;
+          return;
+        }
+
+        document.getElementById('message').textContent = job.message || '';
+        document.getElementById('status').textContent = job.status || '';
+        document.getElementById('progress').textContent = `${job.progress || 0}%`;
+        document.getElementById('bar').style.width = `${job.progress || 0}%`;
 
       if (job.summary) {
         const s = job.summary;
@@ -246,7 +260,7 @@
         const porRegiao = Object.entries(s.por_regiao || {}).map(([k, v]) => `
           <li>
             <span>${k}</span>
-            <strong>${v} ${v === 1 ? 'loja' : 'lojas'}</strong>
+            <strong>${v} ${v === 1 ? 'empresa' : 'empresas'}</strong>
           </li>
         `).join('');
 
@@ -258,7 +272,7 @@
             <div><strong style="color: #f59e0b;">${s.mornos || 0}</strong><span>🟡 Leads Mornos</span></div>
             <div><strong style="color: #94a3b8;">${s.frios || 0}</strong><span>⚪ Leads Frios</span></div>
             <div><strong>${s.com_whatsapp || 0}</strong><span>Com WhatsApp</span></div>
-            <div><strong>${s.com_site || 0}</strong><span>Com site / rede</span></div>
+            <div><strong>${s.com_email || s.com_site || 0}</strong><span>${s.com_email ? 'Com e-mail oficial' : 'Com site / rede'}</span></div>
             <div><strong>${job.duplicadas_ignoradas || 0}</strong><span>${job.repetidas_permitidas ? 'Repetidas no resultado' : 'Repetidas ignoradas'}</span></div>
             <div><strong>${job.historico_total || s.total}</strong><span>No histórico</span></div>
           </div>
@@ -286,6 +300,10 @@
       }
 
       if (job.status !== 'error') setTimeout(poll, 2000);
+      } catch (err) {
+        console.warn('Erro ao consultar status:', err);
+        setTimeout(poll, 3000);
+      }
     }
     poll();
   </script>

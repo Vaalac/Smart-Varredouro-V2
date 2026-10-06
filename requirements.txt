@@ -6,3 +6,4 @@ openpyxl==3.1.5
 playwright==1.49.1
 psycopg[binary]>=3.2,<4
 httpx>=0.28.0
+duckdb>=1.1.0
