@@ -337,6 +337,9 @@ def consultar_chunk_duckdb(
     con = duckdb.connect()
     try:
         con.execute("SET preserve_insertion_order=false;")
+        con.execute("SET enable_http_metadata_cache=true;")
+        con.execute("SET enable_object_cache=true;")
+        con.execute("SET parquet_metadata_cache=true;")
         cnaes_sql = ", ".join(f"'{c}'" for c in cnaes)
         where_conds = [
             f"cnae_fiscal_principal IN ({cnaes_sql})",
@@ -525,9 +528,17 @@ async def executar_varredura_cnpj(
     # Itera chunks da Receita Federal (0 a 9) até preencher as metas de cada cidade
     CHUNK_ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]
     chunks_concluidos = 0
-    max_chunks_para_consultar = min(len(CHUNK_ORDER), 4 if max_lojas <= 10 else TOTAL_CHUNKS)
+    if max_lojas <= 5:
+        max_chunks_para_consultar = 3
+    elif max_lojas <= 10:
+        max_chunks_para_consultar = 4
+    elif max_lojas <= 25:
+        max_chunks_para_consultar = 5
+    else:
+        max_chunks_para_consultar = 6
 
     for step_idx, chunk_idx in enumerate(CHUNK_ORDER[:max_chunks_para_consultar], start=1):
+        total_antes_chunk = total_coletados
         # Verifica se todas as cidades já atingiram max_lojas
         todas_cheias = all(
             len(leads_coletados_por_cidade.get(cid, [])) >= max_lojas
@@ -617,6 +628,10 @@ async def executar_varredura_cnpj(
                 "total": total_cidades_ativas,
                 "message": msg,
             })
+
+        novos_no_chunk = total_coletados - total_antes_chunk
+        if step_idx >= 3 and novos_no_chunk < 25:
+            break
 
     # Compila todos os leads
     todos_leads: List[Dict] = []
